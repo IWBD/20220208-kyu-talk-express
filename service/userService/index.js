@@ -39,6 +39,12 @@ module.exports = {
     
     return
   },
+  checkDuplication: async function( conn, userId ) {
+    const res = await common.connPromise( conn, sql.getUser, [ userId ] )
+    return {
+      isAvailable: res.results.length < 1
+    }
+  },
 }
 
 const sql = {
@@ -55,6 +61,6 @@ const sql = {
     FROM kyu_talk.user
     WHERE user_id = ? AND password = ?`,
   signUpUser: `
-    INSER INTO user 
-    SET = ?`,
+    INSERT INTO user 
+    SET ?`,
 }
