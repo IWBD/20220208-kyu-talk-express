@@ -7,7 +7,12 @@
 var app = require('../app')
 var debug = require('debug')('20220201-kyutalk-server:server')
 var http = require('http')
-// const { Server } = require( 'socket.io' )
+const { Server } = require( 'socket.io' )
+const socketHandler = require( '../socketHandler' )
+const { createClient } = require( 'redis' )
+const redisClient = createClient()
+redisClient.connect();
+redisClient.on('error', (err) => console.log('Redis Client Error', err));
 
 /**
  * Get port from environment and store in Express.
@@ -22,35 +27,30 @@ app.set('port', port)
 
 var server = http.createServer( app )
 
-// const io = new Server( server )
+const io = new Server( server,  {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+} )
 
-// const userNamespace = io.of( '/user-namespace' )
-// const chattingNamespace = io.of( '/chatting-namespace' )
-
-// userNamespace.on( 'connection', ( sockets ) => {
-//   console.log( 'userSocketSpace' )
-// } )
-
-// chattingNamespace.on( 'connection', ( sockets ) => {
-//   console.log( 'chattingSocketSpace' )
-// } )
-
-// app.use( '/', indexRouter )
-
-// app.use(function(req, res, next) {
-//   next(createError(404))
-// })
-
-// // error handler
-// app.use(function(err, req, res, next) {
-//   // set locals, only providing error in development
-//   res.locals.message = err.message
-//   res.locals.error = req.app.get('env') === 'development' ? err : {}
-
-//   // render the error page
-//   res.status(err.status || 500)
-//   res.render('error')
-// })
+// function socketHandler( socket, message ) {
+  
+// }
+io.on( 'connection', socket => {
+  socket.on( 'login', async ( userId ) => {
+    redisClient.set( userId, socket.id )
+  } )
+  socket.on( 'message', ( message ) => {
+    socketHandler.message( redisClient, socket, message )
+  } )
+  socket.on( 'read-message', ( messageList ) => {
+    socketHandler.readMessage( redisClient, socket, messageList )
+  } )
+  socket.on( 'disconnect', () => {
+    console.log( 'disconnect' )
+  } )
+} )
 
 /**
  * Listen on provided port, on all network interfaces.

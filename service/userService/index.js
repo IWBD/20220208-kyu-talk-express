@@ -1,32 +1,26 @@
 const _ = require( 'lodash' )
-const { stdin } = require('nodemon/lib/config/defaults')
 const common = require( '../../utill/common' )
 
 module.exports = { 
   getUserInfo: async function( conn, userId ) {
-    let res = await conn.query( sql.getUser, [ userId ] ) 
+    let res = await common.connPromise( conn, sql.getUser, [ userId ] )
     const user = common.connResultsAsCamelCase( res )[0]
     
     if( !user || _.isEmpty( user ) ) {
       throw new Error( 'user not fond' )
     }
 
-    res = await conn.query( sql.getUserFriend, [ userId ] )
-    user.userFriendList = common.connResultsAsCamelCase( res )
+    res = await common.connPromise( conn, sql.getUserRelation, [ userId ] )
+    const friendList = common.connResultsAsCamelCase( res )
     
-    return user     
+    return { user, friendList }     
   },
-  signInUser: async function( conn, userId, password ) {
-    let res = await common.connPromise( conn, sql.signInUser, [ userId, password ] )
-    
+  login: async function( conn, userId, password ) {
+    let res = await common.connPromise( conn, sql.login, [ userId, password ] )
     const user = common.connResultsAsCamelCase( res )[0]
     if( !user || _.isEmpty( user ) ) {
       throw new Error( 'user not fond' )
     }
-
-    res = await common.connPromise( conn, sql.getUserFriend, [ userId ] )
-    user.friendList = common.connResultsAsCamelCase( res )
-    
     return user  
   },
   signUpUser: async function( conn, { userId, password, name } ) {
@@ -39,7 +33,7 @@ module.exports = {
     
     return
   },
-  checkDuplication: async function( conn, userId ) {
+  checkUserDuplication: async function( conn, userId ) {
     const res = await common.connPromise( conn, sql.getUser, [ userId ] )
     return {
       isAvailable: res.results.length < 1
@@ -52,13 +46,14 @@ const sql = {
     SELECT user_id, name
     FROM user
     WHERE user_id = ?`,
-  getUserFriend: `
-    SELECT user_id, target_user_id
-    FROM user_relation
-    WHERE user_id = ? AND is_friend = true;`,
-  signInUser: `
+  getUserRelation: `
+    SELECT B.user_id, B.name
+    FROM user_relation as A
+    INNER JOIN user as B on A.target_user_id = B.user_id
+    WHERE A.user_id = ? AND A.is_friend = 1 AND A.is_block IS NULL`,
+  login: `
     SELECT user_id, name
-    FROM kyu_talk.user
+    FROM user
     WHERE user_id = ? AND password = ?`,
   signUpUser: `
     INSERT INTO user 

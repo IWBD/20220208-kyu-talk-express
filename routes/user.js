@@ -2,38 +2,42 @@ var express = require('express');
 var router = express.Router();
 const mysql = require( '../utill/mysql/connection' )
 const userService = require( '../service/userService' )
+const chattingService = require( '../service/chattingService' )
+
 
 router.get('/getuserinfo', async function( req, res, next ) {
   let conn
-  let userInfo
-  const userId = req.path.userId
+  const userId = req.query.userId
   try {
     conn = await mysql.getConnection()
-    userInfo = await userService.getUserInfo( conn, userId )
-    res.status( 200 ).send( { code: 200, payload: userInfo } )
-  }catch ( err ) {
+    
+    const { user, friendList } = await userService.getUserInfo( conn, userId )
+    const chattingRoomList = await chattingService.getChattingRoom( conn, userId )
+    const messageList = await chattingService.getMessageList( conn, userId )
+
+    res.status( 200 ).send( { code: 200, payload: { user, friendList, chattingRoomList, messageList } } )
+  } catch ( err ) {
     console.error( err )
     res.status( 500 ).send( err )
+  } finally {
+    conn && conn.release()
   }
 } )
 
-router.post('/signinuser', async function( req, res, next ) {
+router.post('/login', async function( req, res, next ) {
   let conn
-  let userInfo
   const { userId, password } = req.body
+
   try {
     conn = await mysql.getConnection()
-    userInfo = await userService.signInUser( conn, userId, password )
+    const userInfo = await userService.login( conn, userId, password )
     res.status( 200 ).send( { code: 200, payload: userInfo } )
   } catch( err ) {
     console.error( err )
     res.status( 500 ).send( err )
-  } finally{
-    if( conn ) {
-      conn.release()
-    }
+  } finally {
+    conn && conn.release()
   }
-  res.end()
 } )
 
 router.post('/signupuser', async function( req, res, next ) {
@@ -53,10 +57,7 @@ router.post('/signupuser', async function( req, res, next ) {
     console.error( err )
     res.status( 500 ).send( err )
   } finally {
-    console.log( 'finally' )
-    if( conn ) {
-      conn.release()
-    }
+    conn && conn.release()
   }
 } )
 
@@ -66,7 +67,7 @@ router.get('/checkduplication', async function( req, res, next ) {
 
   try {
     conn = await mysql.getConnection()
-    const result = await userService.checkDuplication( conn, userId )
+    const result = await userService.checkUserDuplication( conn, userId )
     res.status( 200 ).send( { code: 200, payload: result } )
   } catch( err ) {
     console.error( err )
