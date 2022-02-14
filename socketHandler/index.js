@@ -1,6 +1,6 @@
 const _ = require( 'lodash' )
 const chattingService = require( '../service/chattingService' )
-const mysql = require( '../utill/mysql/connection' )
+const mysql = require( '../util/mysql/connection' )
 
 // CREATE TABLE message (
 //   message_id INT(10) AUTO_INCREMENT PRIMARY KEY NOT NULL,
@@ -43,6 +43,7 @@ module.exports = {
       for( let i = 0; i < socketIdList.length; i++ ) {
         const sendMessage = {
           ...message,
+          messageId,
           isRead: null,
           notReadCount: fromUserIdList.length
         }

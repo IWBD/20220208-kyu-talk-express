@@ -7,12 +7,15 @@
 var app = require('../app')
 var debug = require('debug')('20220201-kyutalk-server:server')
 var http = require('http')
-const { Server } = require( 'socket.io' )
-const socketHandler = require( '../socketHandler' )
-const { createClient } = require( 'redis' )
-const redisClient = createClient()
-redisClient.connect();
-redisClient.on('error', (err) => console.log('Redis Client Error', err));
+// const { Server } = require( 'socket.io' )
+// const socketHandler = require( '../socketHandler' )
+// const { createClient } = require( 'redis' )
+// const redisClient = createClient()
+// redisClient.connect();
+// redisClient.on('error', (err) => console.log('Redis Client Error', err));
+const { conntectSocket } = require( '../util/socket' )
+const { conntectRedis } = require( '../util/redis' )
+conntectRedis()
 
 /**
  * Get port from environment and store in Express.
@@ -27,30 +30,32 @@ app.set('port', port)
 
 var server = http.createServer( app )
 
-const io = new Server( server,  {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-} )
+conntectSocket( server )
+
+// const io = new Server( server,  {
+//   cors: {
+//     origin: "*",
+//     methods: ["GET", "POST"]
+//   }
+// } )
 
 // function socketHandler( socket, message ) {
   
 // }
-io.on( 'connection', socket => {
-  socket.on( 'login', async ( userId ) => {
-    redisClient.set( userId, socket.id )
-  } )
-  socket.on( 'message', ( message ) => {
-    socketHandler.message( redisClient, socket, message )
-  } )
-  socket.on( 'read-message', ( messageList ) => {
-    socketHandler.readMessage( redisClient, socket, messageList )
-  } )
-  socket.on( 'disconnect', () => {
-    console.log( 'disconnect' )
-  } )
-} )
+// io.on( 'connection', socket => {
+//   socket.on( 'login', async ( userId ) => {
+//     redisClient.set( userId, socket.id )
+//   } )
+//   socket.on( 'message', ( message ) => {
+//     socketHandler.message( redisClient, socket, message )
+//   } )
+//   socket.on( 'read-message', ( messageList ) => {
+//     socketHandler.readMessage( redisClient, socket, messageList )
+//   } )
+//   socket.on( 'disconnect', () => {
+//     console.log( 'disconnect' )
+//   } )
+// } )
 
 /**
  * Listen on provided port, on all network interfaces.

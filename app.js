@@ -6,8 +6,9 @@ var logger = require( 'morgan' )
 const cors = require( 'cors' )
 // const session = require( 'express-session' )
 
-var indexRouter = require( './routes/index' )
+// var indexRouter = require( './routes/index' )
 var userRouter = require( './routes/user' )
+const chattingRouter = require( './routes/chatting' )
 
 var app = express();
 
@@ -28,9 +29,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(cors());
 app.use( '/api/user', userRouter )
-app.use( '/api/chatting', indexRouter )
+app.use( '/api/chatting', chattingRouter )
+// chatting/sendmessage
 
-app.use( '/', indexRouter )
+
+// app.use( '/', indexRouter )
 
 app.use(function(req, res, next) {
   next(createError(404))
