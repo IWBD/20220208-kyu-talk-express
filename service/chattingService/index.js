@@ -19,9 +19,7 @@ module.exports = {
     
     const messageList = _.concat( sendMessageList, fromMessageList )
     
-    const roomIdList = _( messageList )
-      .filter( 'roomId' )
-      .join( ',' )
+    const roomIdList = _( messageList ).filter( 'roomId' ).join( ',' )
     
     res = await common.connPromise( conn, sql.seletCattingRoom, [ roomIdList ] )
     const chattingRoomList = common.connResultsAsCamelCase( res )
@@ -59,23 +57,35 @@ const sql = {
   selectUserMessage: `
     SELECT A.message_id, A.room_id, A.send_user_id, 
       A.create_date, A.modify_date, A.text,
-      ( SELECT count( case when is_read IS NULL THEN 1 END ) 
-        FROM from_user
-        WHERE message_id = A.message_id ) as not_read_count,
+      ( SELECT name
+        FROM user
+        WHERE user_id = A.send_user_id ) as send_user_name,
       ( SELECT user_id 
         FROM from_user
-        WHERE message_id = A.message_id limit 1 ) as user_id
+        WHERE message_id = A.message_id limit 1 ) as from_user_id,
+      ( SELECT name 
+        FROM user
+        WHERE user_id = (
+          SELECT user_id 
+          FROM from_user
+          WHERE message_id = A.message_id limit 1 ) ) as from_user_name,
+      ( SELECT count( case when is_read IS NULL THEN 1 END ) 
+        FROM from_user
+        WHERE message_id = A.message_id ) as not_read_count
     FROM message as A
     WHERE send_user_id = ?`,
   selectFromMessage: `
-    SELECT B.message_id, B.room_id, B.send_user_id, 
-      B.create_date, B.modify_date, B.text, A.user_id, A.is_read,
-      ( SELECT count( case when is_read IS NULL THEN 1 END ) 
-        FROM from_user
-        WHERE message_id = B.message_id ) as not_read_count,
+    SELECT B.message_id, B.room_id, B.send_user_id,
+      B.create_date, B.modify_date, B.text, A.user_id as from_user_id, A.is_read,
+      ( SELECT name 
+        FROM user
+        WHERE user_id = B.send_user_id ) as send_user_name,
       ( SELECT name
         FROM user
-        WHERE user_id = B.send_user_id ) as name
+        WHERE user_id = A.user_id ) as from_user_name,
+      ( SELECT count( case when is_read IS NULL THEN 1 END ) 
+        FROM from_user
+        WHERE message_id = B.message_id ) as not_read_count
     FROM from_user as A
     INNER JOIN message as B on A.message_id = B.message_id
     WHERE A.user_id = ?`,
