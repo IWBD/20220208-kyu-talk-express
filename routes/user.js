@@ -29,17 +29,7 @@ router.post('/login', async function( req, res, next ) {
   let conn
   const { userId, password } = req.body
 
-  var test = [ "test", "test1", "test2" ]
-  console.log( JSON.stringify( test ) )
-
-
-
   try {
-    conn = await mysql.getConnection()
-
-    conn.query( 'update chatting_room set room_user = ? where room_id = 1' [ test ] )
-
-
     const { user, friendList } = await userService.login( conn, userId, password )
     let { messageList, chattingRoomList } = await chattingService.getMessageList( conn, userId )
     const userChattingRoomList = await chattingService.getUserChattingRoom( conn, userId )
