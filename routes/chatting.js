@@ -27,13 +27,16 @@ router.post('/sendmessage', async function( req, res, next ) {
       chattingRoom = _.get( chattingRoom, '0' ) || {}
       try {
         fromUserIdList = JSON.parse( chattingRoom.roomUser )
-        _.remove( fromUserIdList, message.sendUserId )
+        fromUserIdList = _.filter( fromUserIdList, userId => userId !== message.sendUserId )
       } catch( err ) {
         throw err
       } 
+    } else {
+      
     }
     
     const fromUserList = _.map( fromUserIdList, userId => {
+      console.log( userId )
       return { messageId, userId }
     } )
 

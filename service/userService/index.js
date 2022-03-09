@@ -46,11 +46,20 @@ module.exports = {
     let res = await common.connPromise( conn, sql.searchUser, [ userId, `%${searchWord}%` ] )
     return common.connResultsAsCamelCase( res )
   },
+  // let s = _.replace( sql.getOrderItemListForStatis, '{{dealIdList}}', _.join( dealIdList ) )
   addUserRelation: async function( conn, userId, targetUserIdList, isFriend = null, isBlock = null, update = false ) {
-    let res = await common.connPromise( conn, sql.selectUserRelationByTargetUser, [ userId, _.join( targetUserIdList, ', ' ) ] )
+    const targetUserIdListStr = _.map( targetUserIdList, userId => {
+      return `'${userId}'`
+    } ).join(',')
+
+    const s = _.replace( sql.selectUserRelationByTargetUser, '{{targetUserIdList}}', targetUserIdListStr )
+    console.log( s )
+    let res = await common.connPromise( conn, s, [ userId ] )
     const userRelationList = common.connResultsAsCamelCase( res )
+
     for( let i = 0; i < targetUserIdList.length; i++ ) {
       const userRelation = _.find( userRelationList, { userId: targetUserIdList[i] } )
+      console.log( userRelation )
       if( !userRelation ) {
         res = await common.connPromise( conn, sql.insertUserRelation, [ userId, targetUserIdList[i], isFriend ] ) 
       } else if( update ) {
@@ -58,7 +67,7 @@ module.exports = {
       }
     }
 
-    res = await common.connPromise( conn, sql.selectUserRelationByTargetUser, [ userId, _.join( targetUserIdList, ', ' ) ] )
+    res = await common.connPromise( conn, s, [ userId ] )
     
     return common.connResultsAsCamelCase( res )
   },
@@ -82,7 +91,7 @@ const sql = {
     SELECT B.user_id, B.name, A.is_friend, A.is_block
     FROM user_relation as A
     INNER JOIN user as B on A.target_user_id = B.user_id
-    WHERE A.user_id = ? AND target_user_id IN (?)`,
+    WHERE A.user_id = ? AND A.target_user_id IN ({{targetUserIdList}})`,
   login: `
     SELECT user_id, name
     FROM user

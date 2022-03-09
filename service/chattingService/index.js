@@ -40,6 +40,7 @@ module.exports = {
   insertFromUser: async function( conn, fromUserList = [] ) {
     for( let i = 0; i < fromUserList.length; i++ ) {
       const { messageId, userId } = fromUserList[i]
+      console.log( [ messageId, userId ] )
       await common.connPromise( conn, sql.inserFromUser, [ messageId, userId ] )
     }
   },
