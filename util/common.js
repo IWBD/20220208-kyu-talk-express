@@ -8,12 +8,16 @@ module.exports = {
     return _.mapKeys( params, ( value, key ) => _.lowerCase( key ).replace( /\s/g, '_' )  ) 
   },
   connPromise: ( conn, sql, values ) => {
+    if( !conn ) {
+      throw new Error( 'no connection' )
+    }
+
     return new Promise( ( resolve, reject ) => {
       conn.query( sql, values, function( err, results, fields ) {
         if( err ) {
           reject( err )
         }
-        resolve( { results, fields })
+        resolve( { results, fields } )
       } )
     } )
   }

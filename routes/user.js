@@ -11,12 +11,15 @@ router.get('/getuserinfo', async function( req, res, next ) {
   try {
     conn = await mysql.getConnection()
 
-    const { user, friendList } = await userService.getUserInfo( conn, userId )
+    const user = await userService.getUserInfo( conn, userId )
+    const userRelationList = await userService.getUserRelationList( conn, userId )
+
     let { messageList, chattingRoomList } = await chattingService.getMessageList( conn, userId )
+
     const userChattingRoomList = await chattingService.getUserChattingRoom( conn, userId )
     chattingRoomList = [ ...chattingRoomList, ...userChattingRoomList ]
 
-    res.status( 200 ).send( { code: 200, payload: { user, friendList, chattingRoomList, messageList } } )
+    res.status( 200 ).send( { code: 200, payload: { user, userRelationList, chattingRoomList, messageList } } )
   } catch ( err ) {
     console.error( err )
     res.status( 500 ).send( err )
@@ -30,12 +33,15 @@ router.post('/login', async function( req, res, next ) {
   const { userId, password } = req.body
 
   try {
-    const { user, friendList } = await userService.login( conn, userId, password )
+    const user = await userService.login( conn, userId, password )
+    const userRelationList = await userService.getUserRelationList( conn, userId )
+
     let { messageList, chattingRoomList } = await chattingService.getMessageList( conn, userId )
+
     const userChattingRoomList = await chattingService.getUserChattingRoom( conn, userId )
     chattingRoomList = [ ...chattingRoomList, ...userChattingRoomList ]
 
-    res.status( 200 ).send( { code: 200, payload: { user, friendList, chattingRoomList, messageList } } )
+    res.status( 200 ).send( { code: 200, payload: { user, userRelationList, chattingRoomList, messageList } } )
   } catch( err ) {
     console.error( err )
     res.status( 500 ).send( err )
@@ -107,16 +113,16 @@ router.post( '/addfriend', async function( req, res, next ) {
 
   try {
     conn = await mysql.getConnection()
-    await userService.addFriend( conn, userId, targetUserId )
-    const result = await userService.getFriendList( conn, userId )
-    res.status( 200 ).send( { code: 200, payload: result } )
+    const isFriend = 1
+    const isBlock = null
+    const update = true
+    const userRelation = await userService.addUserRelation( conn, userId, [targetUserId], isFriend, isBlock, update )[0]
+    res.status( 200 ).send( { code: 200, payload: userRelation } )
   } catch( err ) {
     console.error( err )
     res.status( 500 ).send( err )
   } finally {
-    if( conn ) {
-      conn.release()
-    }
+    conn && conn.release()
   }
 } )
 

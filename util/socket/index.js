@@ -1,5 +1,6 @@
 const { Server } = require( 'socket.io' )
 const { getRedisClient } = require( '../redis' )
+const _ = require( 'lodash' )
 const redisClient = getRedisClient()
 let socketIo
 
@@ -17,15 +18,16 @@ function conntectSocket( server ) {
   } )
 }
 
-async function pushMessage( message, fromUserIdList ) {
+async function pushMessage( pushMessageList ) {
   const socketIdList = []
-  for( let i = 0; i < fromUserIdList.length; i++ ) {
-    const socketId = await redisClient.get( fromUserIdList[i] )
-    socketId && socketIdList.push( socketId )
+  for( let i = 0; i < pushMessageList.length; i++ ) {
+    const { fromUserId } = pushMessageList[i]
+    const socketId = await redisClient.get( fromUserId )
+    socketId && socketIdList.push( { socketId, pushMessage: pushMessageList[i] } )
   }
 
   for( let i = 0; i < socketIdList.length; i++ ) {
-    socketIo.to( socketIdList[i] ).emit( 'message', message )
+    socketIo.to( socketIdList[i].socketId ).emit( 'message', socketIdList[i].pushMessage )
   }
 }
 

@@ -2,8 +2,8 @@ const _ = require( 'lodash' )
 const common = require( '../../util/common' )
 
 module.exports = {
-  getChattingRoom: async function( conn, roomId ) {
-    let res = await common.connPromise( conn, sql.seletCattingRoom, [ roomId ] )
+  getChattingRoom: async function( conn, roomIdList ) {
+    const res = await common.connPromise( conn, sql.seletCattingRoom, [ _.join( roomIdList, ', ' ) ] )
     return common.connResultsAsCamelCase( res )
   },
   getUserChattingRoom: async function( conn, userId ) {
@@ -26,7 +26,7 @@ module.exports = {
 
     return { messageList, chattingRoomList }
   },
-  insertMessage: async function( conn, message ) {
+  addMessage: async function( conn, message ) {
     let res = await common.connPromise( conn, sql.insertMessage, [ 
       message.roomId, message.sendUserId, message.text, message.createDate
     ] )
@@ -43,32 +43,36 @@ module.exports = {
       await common.connPromise( conn, sql.inserFromUser, [ messageId, userId ] )
     }
   },
+  addChattingRoom: async function( conn, createUserId, roomUser ) {
+    const now = new Date().getTime()
+
+    let res = await common.connPromise( conn, sql.inserChattingRoom, [ createUserId, JSON.stringify( roomUser ), now ] )
+    
+    const insertId = _.get( res, 'results.insertId' ) 
+    if( !insertId ) {
+      throw new Error( 'chattingRoom insert fail' )
+    }
+    
+    res = await common.connPromise( conn, sql.seletCattingRoom, [ insertId ] )
+    return common.connResultsAsCamelCase( res )
+  }
 }
 
 const sql = {
   seletCattingRoom: `
-    SELECT room_id, create_user_id, room_user
+    SELECT room_id, create_user_id, room_user, create_date
     FROM chatting_room
     WHERE room_id in ( ? )`,
   seletUserCattingRoom: `
-    SELECT room_id, create_user_id, room_user
+    SELECT room_id, create_user_id, room_user, create_date
     FROM chatting_room
     WHERE create_user_id = ?`,
   selectUserMessage: `
     SELECT A.message_id, A.room_id, A.send_user_id, 
       A.create_date, A.modify_date, A.text,
-      ( SELECT name
-        FROM user
-        WHERE user_id = A.send_user_id ) as send_user_name,
       ( SELECT user_id 
         FROM from_user
         WHERE message_id = A.message_id limit 1 ) as from_user_id,
-      ( SELECT name 
-        FROM user
-        WHERE user_id = (
-          SELECT user_id 
-          FROM from_user
-          WHERE message_id = A.message_id limit 1 ) ) as from_user_name,
       ( SELECT count( case when is_read IS NULL THEN 1 END ) 
         FROM from_user
         WHERE message_id = A.message_id ) as not_read_count
@@ -77,12 +81,6 @@ const sql = {
   selectFromMessage: `
     SELECT B.message_id, B.room_id, B.send_user_id,
       B.create_date, B.modify_date, B.text, A.user_id as from_user_id, A.is_read,
-      ( SELECT name 
-        FROM user
-        WHERE user_id = B.send_user_id ) as send_user_name,
-      ( SELECT name
-        FROM user
-        WHERE user_id = A.user_id ) as from_user_name,
       ( SELECT count( case when is_read IS NULL THEN 1 END ) 
         FROM from_user
         WHERE message_id = B.message_id ) as not_read_count
@@ -94,6 +92,8 @@ const sql = {
     VALUES( ?, ?, ?, ? )`,
   inserFromUser: `
     INSERT INTO from_user( message_id, user_id )
-    VALUES( ?, ? )
-  `
+    VALUES( ?, ? )`,
+  inserChattingRoom: `
+    INSERT INTO chatting_room( create_user_id, room_user, create_date )
+    VALUES( ?, ?, ? )`
 }
