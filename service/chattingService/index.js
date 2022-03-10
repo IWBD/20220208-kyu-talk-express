@@ -3,7 +3,8 @@ const common = require( '../../util/common' )
 
 module.exports = {
   getChattingRoom: async function( conn, roomIdList ) {
-    const res = await common.connPromise( conn, sql.seletCattingRoom, [ _.join( roomIdList, ', ' ) ] )
+    const s = _.replace( sql.seletCattingRoom, '{{roomIdList}}', _.join( roomIdList, ', ' ) )
+    const res = await common.connPromise( conn, s )
     return common.connResultsAsCamelCase( res )
   },
   getUserChattingRoom: async function( conn, userId ) {
@@ -18,11 +19,22 @@ module.exports = {
     const fromMessageList = common.connResultsAsCamelCase( res )
     
     const messageList = _.concat( sendMessageList, fromMessageList )
+
+    const roomIdList = _( messageList )
+      .filter( 'roomId' )
+      .map( 'roomId' )
+      .uniqBy()
+      .join( ',' )
     
-    const roomIdList = _( messageList ).filter( 'roomId' ).join( ',' )
-    
-    res = await common.connPromise( conn, sql.seletCattingRoom, [ roomIdList ] )
-    const chattingRoomList = common.connResultsAsCamelCase( res )
+    let chattingRoomList
+    if( roomIdList ) {
+      const s = _.replace( sql.seletCattingRoom, '{{roomIdList}}', roomIdList )
+      
+      res = await common.connPromise( conn, s )
+      chattingRoomList = common.connResultsAsCamelCase( res )
+    } else {
+      chattingRoomList = []
+    }
 
     return { messageList, chattingRoomList }
   },
@@ -53,8 +65,8 @@ module.exports = {
     if( !insertId ) {
       throw new Error( 'chattingRoom insert fail' )
     }
-    
-    res = await common.connPromise( conn, sql.seletCattingRoom, [ insertId ] )
+    const s = _.replace( sql.seletCattingRoom, '{{roomIdList}}', insertId )
+    res = await common.connPromise( conn, s )
     return common.connResultsAsCamelCase( res )
   }
 }
@@ -63,7 +75,7 @@ const sql = {
   seletCattingRoom: `
     SELECT room_id, create_user_id, room_user, create_date
     FROM chatting_room
-    WHERE room_id in ( ? )`,
+    WHERE room_id in ( {{roomIdList}} )`,
   seletUserCattingRoom: `
     SELECT room_id, create_user_id, room_user, create_date
     FROM chatting_room

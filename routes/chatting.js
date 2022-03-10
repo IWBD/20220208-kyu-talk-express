@@ -4,7 +4,8 @@ const _ = require( 'lodash' )
 const { pushMessage } = require( '../util/socket' )
 const chattingService = require( '../service/chattingService' )
 const userService = require( '../service/userService' )
-const mysql = require( '../util/mysql/connection' )
+const mysql = require( '../util/mysql/connection' );
+const { text } = require('express');
 
 router.post('/makechttingroom', function( req, res, next ) {
   res.send('makechttingroom')
@@ -31,12 +32,9 @@ router.post('/sendmessage', async function( req, res, next ) {
       } catch( err ) {
         throw err
       } 
-    } else {
-      
-    }
+    } 
     
     const fromUserList = _.map( fromUserIdList, userId => {
-      console.log( userId )
       return { messageId, userId }
     } )
 
@@ -60,12 +58,14 @@ router.post('/sendmessage', async function( req, res, next ) {
     }
 
     const userRelationMap = {}
-    for( let i = 0; i < fromUserIdList.length; i++ ) {
-      try {
-        const userRelation = await userService.addUserRelation( conn, fromUserIdList[i], [ message.sendUserId ] )[0]
-        userRelationMap[fromUserIdList[i]] = userRelation 
-      } catch( err ) {
-        console.error( err )
+    
+    const test = [ ...fromUserIdList, message.sendUserId ]
+    for( let i = 0; i < test.length; i++ ) {
+      const userId = test[i]
+      const targetUserIdList = _.filter( test, t => t !== userId )
+      for( let j = 0; j < targetUserIdList.length; j ++ ) {
+        const userRelationList = await userService.addUserRelation( conn, userId, targetUserIdList )
+        userRelationMap[userId] = userRelationList
       }
     }
     
@@ -75,7 +75,7 @@ router.post('/sendmessage', async function( req, res, next ) {
         fromUserId,
         chattingRoom,
         message: sendMessage,
-        userRelation: userRelationMap[fromUserId] || null,
+        userRelationList: userRelationMap[fromUserId] || null,
       }
     } )
     
@@ -104,11 +104,11 @@ router.post('/addchattingroom', async function( req, res ) {
 
     conn = await mysql.getConnection()
 
-    const chattingRoom = await chattingService.addChattingRoom( conn, createUserId, roomUser )
-    const roomUser = await userService.getUserList( conn, userIdList )
-    chattingRoom.roomUser = roomUser
+    const chattingRoomList = await chattingService.addChattingRoom( conn, createUserId, roomUser )
+    // roomUser = await userService.getUserList( conn, roomUser )
+    // chattingRoom.roomUser = roomUser
 
-    res.status( 200 ).json( { code: 200, payload: chattingRoom } )
+    res.status( 200 ).json( { code: 200, payload: chattingRoomList[0] } )
   } catch( err ) {
     console.error( err )
     res.status( 500 ).send( err )

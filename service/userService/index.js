@@ -37,7 +37,7 @@ module.exports = {
     return
   },
   checkUserDuplication: async function( conn, userId ) {
-    const res = await common.connPromise( conn, sql.getUser, [ userId ] )
+    const res = await common.connPromise( conn, sql.selectUser, [ userId ] )
     return {
       isAvailable: res.results.length < 1
     }
@@ -46,32 +46,31 @@ module.exports = {
     let res = await common.connPromise( conn, sql.searchUser, [ userId, `%${searchWord}%` ] )
     return common.connResultsAsCamelCase( res )
   },
-  // let s = _.replace( sql.getOrderItemListForStatis, '{{dealIdList}}', _.join( dealIdList ) )
   addUserRelation: async function( conn, userId, targetUserIdList, isFriend = null, isBlock = null, update = false ) {
     const targetUserIdListStr = _.map( targetUserIdList, userId => {
       return `'${userId}'`
     } ).join(',')
 
     const s = _.replace( sql.selectUserRelationByTargetUser, '{{targetUserIdList}}', targetUserIdListStr )
-    console.log( s )
     let res = await common.connPromise( conn, s, [ userId ] )
     const userRelationList = common.connResultsAsCamelCase( res )
 
     for( let i = 0; i < targetUserIdList.length; i++ ) {
       const userRelation = _.find( userRelationList, { userId: targetUserIdList[i] } )
-      console.log( userRelation )
       if( !userRelation ) {
-        res = await common.connPromise( conn, sql.insertUserRelation, [ userId, targetUserIdList[i], isFriend ] ) 
+        await common.connPromise( conn, sql.insertUserRelation, [ userId, targetUserIdList[i], isFriend ] ) 
       } else if( update ) {
-        res = await common.connPromise( conn, sql.updateUserRelation, [ isFriend, isBlock, userId, targetUserIdList[i] ] )
+        await common.connPromise( conn, sql.updateUserRelation, [ isFriend, isBlock, userId, targetUserIdList[i] ] )
       }
     }
 
     res = await common.connPromise( conn, s, [ userId ] )
-    
     return common.connResultsAsCamelCase( res )
   },
   getUserList: async function( conn, userIdList ) {
+    const userIdListStr = _.map( userIdList, userId => {
+      return `'${userId}'`
+    } ).join(',')
     let res = await common.connPromise( conn, sql.selectUserList, [ _.join( userIdList, ', ' ) ] )
     return common.connResultsAsCamelCase( res )
   }
@@ -111,7 +110,7 @@ const sql = {
     FROM user
     WHERE user_id in (?)`,
   updateUserRelation: `
-    UPDATE user_realtion
+    UPDATE user_relation
     SET is_friend = ?, is_block = ?
     WHERE user_id = ? AND target_user_id = ?`
 }

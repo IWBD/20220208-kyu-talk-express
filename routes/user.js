@@ -17,7 +17,10 @@ router.get('/getuserinfo', async function( req, res, next ) {
     let { messageList, chattingRoomList } = await chattingService.getMessageList( conn, userId )
 
     const userChattingRoomList = await chattingService.getUserChattingRoom( conn, userId )
-    chattingRoomList = [ ...chattingRoomList, ...userChattingRoomList ]
+    chattingRoomList = _( chattingRoomList || [] )
+      .concat( userChattingRoomList )
+      .uniqBy( 'roomId' )
+      .value()
 
     res.status( 200 ).send( { code: 200, payload: { user, userRelationList, chattingRoomList, messageList } } )
   } catch ( err ) {
@@ -33,13 +36,18 @@ router.post('/login', async function( req, res, next ) {
   const { userId, password } = req.body
 
   try {
+    conn = await mysql.getConnection()
+
     const user = await userService.login( conn, userId, password )
     const userRelationList = await userService.getUserRelationList( conn, userId )
 
     let { messageList, chattingRoomList } = await chattingService.getMessageList( conn, userId )
 
     const userChattingRoomList = await chattingService.getUserChattingRoom( conn, userId )
-    chattingRoomList = [ ...chattingRoomList, ...userChattingRoomList ]
+    chattingRoomList = _( chattingRoomList || [] )
+      .concat( userChattingRoomList )
+      .uniqBy( 'roomId' )
+      .value()
 
     res.status( 200 ).send( { code: 200, payload: { user, userRelationList, chattingRoomList, messageList } } )
   } catch( err ) {
@@ -116,8 +124,8 @@ router.post( '/addfriend', async function( req, res, next ) {
     const isFriend = 1
     const isBlock = null
     const update = true
-    const userRelation = await userService.addUserRelation( conn, userId, [targetUserId], isFriend, isBlock, update )[0]
-    res.status( 200 ).send( { code: 200, payload: userRelation } )
+    const userRelation = await userService.addUserRelation( conn, userId, [targetUserId], isFriend, isBlock, update )
+    res.status( 200 ).send( { code: 200, payload: userRelation[0] } )
   } catch( err ) {
     console.error( err )
     res.status( 500 ).send( err )
