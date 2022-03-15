@@ -1,42 +1,152 @@
 const _ = require( 'lodash' )
+const { connParamsAsPothole } = require('../../util/common')
 const common = require( '../../util/common' )
+const userService = require( '../userService' )
 
 module.exports = {
-  getChattingRoom: async function( conn, roomIdList ) {
+  getChattingRoomByRoomId: async function( conn, roomIdList ) {
     const s = _.replace( sql.seletCattingRoom, '{{roomIdList}}', _.join( roomIdList, ', ' ) )
-    const res = await common.connPromise( conn, s )
-    return common.connResultsAsCamelCase( res )
-  },
-  getUserChattingRoom: async function( conn, userId ) {
-    let res = await common.connPromise( conn, sql.seletUserCattingRoom, [ userId ] )
-    return common.connResultsAsCamelCase( res )
-  },
-  getMessageList: async function( conn, userId ) {
-    let res = await common.connPromise( conn, sql.selectUserMessage, [ userId ] )
-    let sendMessageList = common.connResultsAsCamelCase( res )
-    
-    res = await common.connPromise( conn, sql.selectFromMessage, [ userId ] )
-    const fromMessageList = common.connResultsAsCamelCase( res )
-    
-    const messageList = _.concat( sendMessageList, fromMessageList )
 
-    const roomIdList = _( messageList )
-      .filter( 'roomId' )
-      .map( 'roomId' )
-      .uniqBy()
-      .join( ',' )
+    let chattingRoomList = await common.connPromise( conn, s )
+    chattingRoomList = common.connResultsAsCamelCase( chattingRoomList )
+
+    _.forEach( chattingRoomList, chattingRoom => {
+      try {
+        chattingRoom.roomUser = JSON.parse( chattingRoom.roomUser )
+      } catch( err ) {
+        console.error( err, chattingRoom )
+      }
+    } )
     
-    let chattingRoomList
-    if( roomIdList ) {
-      const s = _.replace( sql.seletCattingRoom, '{{roomIdList}}', roomIdList )
+    if( chattingRoomList.length > 0 ) {
+      const userIdList = _( chattingRoomList )
+        .map( 'roomUser' )
+        .flatten()
+        .compact()
+        .uniq()
+        .value()
+  
+      const userList = await userService.getUserListByUserId( conn, userIdList )
+      const userMap = _.keyBy( userList, 'userId' )
       
-      res = await common.connPromise( conn, s )
-      chattingRoomList = common.connResultsAsCamelCase( res )
-    } else {
-      chattingRoomList = []
+      _.forEach( chattingRoomList, chattingRoom => {
+        chattingRoom.roomUser = _.map( chattingRoom.roomUser, userId => _.get( userMap, userId ) || null ) 
+      } )
     }
 
-    return { messageList, chattingRoomList }
+    return chattingRoomList
+  },
+  getChattingRoomByUserId: async function( conn, userId ) {
+    let chattingRoomList = await common.connPromise( conn, sql.seletUserCattingRoom, [ userId ] )
+    chattingRoomList = common.connResultsAsCamelCase( chattingRoomList )
+
+    _.forEach( chattingRoomList, chattingRoom => {
+      try {
+        chattingRoom.roomUser = JSON.parse( chattingRoom.roomUser )
+      } catch( err ) {
+        console.error( err, chattingRoom )
+      }
+    } )
+
+    if( chattingRoomList.length > 0 ) {
+      const userIdList = _( chattingRoomList )
+        .map( 'roomUser' )
+        .flatten()
+        .compact()
+        .uniq()
+        .value()
+  
+      const userList = await userService.getUserListByUserId( conn, userIdList )
+      const userMap = _.keyBy( userList, 'userId' )
+      
+      _.forEach( chattingRoomList, chattingRoom => {
+        chattingRoom.roomUser = _.map( chattingRoom.roomUser, userId => _.get( userMap, userId ) || null )
+      } )
+    }
+
+    return chattingRoomList
+  },
+  getMessageListByUserId: async function( conn, userId ) {
+    let res = await common.connPromise( conn, sql.selectUserMessage, [ userId ] )
+    sendMessageList = common.connResultsAsCamelCase( res )
+    
+    res = await common.connPromise( conn, sql.selectFromMessage, [ userId ] )
+    fromMessageList = common.connResultsAsCamelCase( res )
+
+    let messageList = _.concat( sendMessageList, fromMessageList )
+
+    const fromUserIdList = _( messageList )
+      .map( ( { sendUserId, fromUserId } ) => [ sendUserId, fromUserId ] )
+      .flatten()
+      .uniq()
+      .value() 
+    
+    const userList = await userService.getUserListByUserId( conn, fromUserIdList )
+    const userMap = _.keyBy( userList, 'userId' ) 
+
+    messageList = _( sendMessageList )
+      .concat( fromMessageList )
+      .groupBy( 'messageId' )
+      .map( messageList => {
+        const message = messageList[0]
+        const fromUserList = _.map( messageList, ( { fromUserId, isRead } ) => {
+          return {
+            isRead,
+            userId: fromUserId,
+            name: _.get( userMap, `${fromUserId}.name` )
+          }
+        } ) 
+        return {
+          messageId: message.messageId,
+          roomId: message.roomId,
+          sendUserId: message.sendUserId,
+          sendUserName: _.get( userMap, `${message.sendUserId}.name` ),
+          createDate: message.createDate,
+          text: message.text,
+          fromUserList
+        }
+      } )
+      .value()
+
+    return messageList
+  },
+  getMessage: async function( conn, messageId ) {
+    let res = await common.connPromise( conn, sql.selectMessage, [ messageId ] )
+    let messageList = common.connResultsAsCamelCase( res )
+
+    const fromUserIdList = _( messageList )
+      .map( ( { sendUserId, fromUserId } ) => [ sendUserId, fromUserId ] )
+      .flatten()
+      .uniq()
+      .value() 
+    
+    const userList = await userService.getUserListByUserId( conn, fromUserIdList )
+    const userMap = _.keyBy( userList, 'userId' ) 
+
+    messageList = _( messageList )
+      .groupBy( 'messageId' )
+      .map( messageList => {
+        const message = messageList[0]
+        const fromUserList = _.map( messageList, ( { fromUserId, isRead } ) => {
+          return {
+            isRead,
+            userId: fromUserId,
+            name: _.get( userMap, `${fromUserId}.name` )
+          }
+        } ) 
+        return {
+          messageId: message.messageId,
+          roomId: message.roomId,
+          sendUserId: message.sendUserId,
+          sendUserName: _.get( userMap, `${message.sendUserId}.name` ),
+          createDate: message.createDate,
+          text: message.text,
+          fromUserList
+        }
+      } )
+      .value()
+    
+    return _.get( messageList, 0 ) || {}
   },
   addMessage: async function( conn, message ) {
     let res = await common.connPromise( conn, sql.insertMessage, [ 
@@ -49,11 +159,9 @@ module.exports = {
     
     return res.results.insertId
   },
-  insertFromUser: async function( conn, fromUserList = [] ) {
-    for( let i = 0; i < fromUserList.length; i++ ) {
-      const { messageId, userId } = fromUserList[i]
-      console.log( [ messageId, userId ] )
-      await common.connPromise( conn, sql.inserFromUser, [ messageId, userId ] )
+  addFromUser: async function( conn, messageId, fromUserIdList = [] ) {
+    for( let i = 0; i < fromUserIdList.length; i++ ) {
+      await common.connPromise( conn, sql.inserFromUser, [ messageId, fromUserIdList[i] ] )
     }
   },
   addChattingRoom: async function( conn, createUserId, roomUser ) {
@@ -65,9 +173,8 @@ module.exports = {
     if( !insertId ) {
       throw new Error( 'chattingRoom insert fail' )
     }
-    const s = _.replace( sql.seletCattingRoom, '{{roomIdList}}', insertId )
-    res = await common.connPromise( conn, s )
-    return common.connResultsAsCamelCase( res )
+
+    return insertId
   }
 }
 
@@ -80,26 +187,31 @@ const sql = {
     SELECT room_id, create_user_id, room_user, create_date
     FROM chatting_room
     WHERE create_user_id = ?`,
+  selectMessage: `
+    SELECT A.message_id, A.room_id, A.send_user_id, 
+      A.create_date, A.modify_date, A.text, 
+      B.user_id as from_user_id, B.is_read
+    FROM message as A
+    INNER JOIN from_user as B on B.message_id = A.message_id
+    WHERE A.message_id = ?`
+  ,
   selectUserMessage: `
     SELECT A.message_id, A.room_id, A.send_user_id, 
-      A.create_date, A.modify_date, A.text,
-      ( SELECT user_id 
-        FROM from_user
-        WHERE message_id = A.message_id limit 1 ) as from_user_id,
-      ( SELECT count( case when is_read IS NULL THEN 1 END ) 
-        FROM from_user
-        WHERE message_id = A.message_id ) as not_read_count
+      A.create_date, A.modify_date, A.text, 
+      B.user_id as from_user_id, B.is_read
     FROM message as A
-    WHERE send_user_id = ?`,
+    INNER JOIN from_user as B on B.message_id = A.message_id
+    WHERE A.send_user_id = ?`,
   selectFromMessage: `
-    SELECT B.message_id, B.room_id, B.send_user_id,
-      B.create_date, B.modify_date, B.text, A.user_id as from_user_id, A.is_read,
-      ( SELECT count( case when is_read IS NULL THEN 1 END ) 
-        FROM from_user
-        WHERE message_id = B.message_id ) as not_read_count
-    FROM from_user as A
-    INNER JOIN message as B on A.message_id = B.message_id
-    WHERE A.user_id = ?`,
+    SELECT A.message_id, A.room_id, A.send_user_id, 
+      A.create_date, A.modify_date, A.text, 
+      B.user_id as from_user_id, B.is_read
+    FROM message as A
+    INNER JOIN from_user as B on B.message_id = A.message_id
+    WHERE A.message_id IN ( 
+      SELECT message_id 
+      FROM from_user
+      WHERE user_id = ? )`,
   insertMessage: `
     INSERT INTO message( room_id, send_user_id, text, create_date )
     VALUES( ?, ?, ?, ? )`,

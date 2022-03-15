@@ -14,9 +14,18 @@ router.get('/getuserinfo', async function( req, res, next ) {
     const user = await userService.getUserInfo( conn, userId )
     const userRelationList = await userService.getUserRelationList( conn, userId )
 
-    let { messageList, chattingRoomList } = await chattingService.getMessageList( conn, userId )
+    const messageList = await chattingService.getMessageListByUserId( conn, userId )
 
-    const userChattingRoomList = await chattingService.getUserChattingRoom( conn, userId )
+    const roomIdList = _( messageList )
+      .filter( 'roomId' )
+      .map( 'roomId' )
+      .uniqBy()
+      .value()
+
+    let chattingRoomList = await chattingService.getChattingRoomByRoomId( conn, roomIdList )
+
+    const userChattingRoomList = await chattingService.getChattingRoomByUserId( conn, userId )
+    
     chattingRoomList = _( chattingRoomList || [] )
       .concat( userChattingRoomList )
       .uniqBy( 'roomId' )
@@ -37,19 +46,8 @@ router.post('/login', async function( req, res, next ) {
 
   try {
     conn = await mysql.getConnection()
-
-    const user = await userService.login( conn, userId, password )
-    const userRelationList = await userService.getUserRelationList( conn, userId )
-
-    let { messageList, chattingRoomList } = await chattingService.getMessageList( conn, userId )
-
-    const userChattingRoomList = await chattingService.getUserChattingRoom( conn, userId )
-    chattingRoomList = _( chattingRoomList || [] )
-      .concat( userChattingRoomList )
-      .uniqBy( 'roomId' )
-      .value()
-
-    res.status( 200 ).send( { code: 200, payload: { user, userRelationList, chattingRoomList, messageList } } )
+    await userService.login( conn, userId, password )
+    res.status( 200 ).send( { code: 200 } )
   } catch( err ) {
     console.error( err )
     res.status( 500 ).send( err )

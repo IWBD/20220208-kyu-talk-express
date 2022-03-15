@@ -4,8 +4,7 @@ const _ = require( 'lodash' )
 const { pushMessage } = require( '../util/socket' )
 const chattingService = require( '../service/chattingService' )
 const userService = require( '../service/userService' )
-const mysql = require( '../util/mysql/connection' );
-const { text } = require('express');
+const mysql = require( '../util/mysql/connection' )
 
 router.post('/makechttingroom', function( req, res, next ) {
   res.send('makechttingroom')
@@ -17,65 +16,28 @@ router.post('/sendmessage', async function( req, res, next ) {
   
   try {
     conn = await mysql.getConnection()
-
+    
     const messageId = await chattingService.addMessage( conn, message )
+    
+    let chattingRoom = null
 
     const roomId = _.get( message, 'roomId' )
-
-    let chattingRoom = null
     if( roomId ) {
-      chattingRoom = await chattingService.getChattingRoom( conn, [ roomId ] )
+      chattingRoom = await chattingService.getChattingRoomByRoomId( conn, [ roomId ] )
       chattingRoom = _.get( chattingRoom, '0' ) || {}
-      try {
-        fromUserIdList = JSON.parse( chattingRoom.roomUser )
-        fromUserIdList = _.filter( fromUserIdList, userId => userId !== message.sendUserId )
-      } catch( err ) {
-        throw err
-      } 
+      fromUserIdList = _.map( chattingRoom.roomUser, 'userId' )
     } 
     
-    const fromUserList = _.map( fromUserIdList, userId => {
-      return { messageId, userId }
-    } )
+    await chattingService.addFromUser( conn, messageId, fromUserIdList )
 
-    await chattingService.insertFromUser( conn, fromUserList )
-    const userRelationList = await userService.addUserRelation( conn, message.sendUserId, fromUserIdList )
+    message = await chattingService.getMessage( conn, messageId )
 
-    if( !roomId ) {
-      message.fromUserId = fromUserIdList[0]
-    }
+    res.status( 200 ).json( { code: 200, payload: { message, chattingRoom } } )
 
-    message.messageId = messageId 
-
-    res.status( 200 ).json( { code: 200, payload: { message, chattingRoom, userRelationList } } )
-
-    message = {
-      ...message,
-      messageId,
-      isRead: null,
-      fromUserId: null,
-      notReadCount: fromUserIdList.length
-    }
-
-    const userRelationMap = {}
-    
-    const test = [ ...fromUserIdList, message.sendUserId ]
-    for( let i = 0; i < test.length; i++ ) {
-      const userId = test[i]
-      const targetUserIdList = _.filter( test, t => t !== userId )
-      for( let j = 0; j < targetUserIdList.length; j ++ ) {
-        const userRelationList = await userService.addUserRelation( conn, userId, targetUserIdList )
-        userRelationMap[userId] = userRelationList
-      }
-    }
-    
     const pushMessageList = _.map( fromUserIdList, fromUserId => {
-      const sendMessage = { ...message, fromUserId }
       return {
         fromUserId,
-        chattingRoom,
-        message: sendMessage,
-        userRelationList: userRelationMap[fromUserId] || null,
+        params: { chattingRoom, message }
       }
     } )
     
@@ -104,9 +66,9 @@ router.post('/addchattingroom', async function( req, res ) {
 
     conn = await mysql.getConnection()
 
-    const chattingRoomList = await chattingService.addChattingRoom( conn, createUserId, roomUser )
-    // roomUser = await userService.getUserList( conn, roomUser )
-    // chattingRoom.roomUser = roomUser
+    const roomId = await chattingService.addChattingRoom( conn, createUserId, roomUser )
+
+    const chattingRoomList = await chattingService.getChattingRoomByRoomId( conn, [ roomId ] )
 
     res.status( 200 ).json( { code: 200, payload: chattingRoomList[0] } )
   } catch( err ) {

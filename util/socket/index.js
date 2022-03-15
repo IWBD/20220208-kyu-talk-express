@@ -21,9 +21,9 @@ function conntectSocket( server ) {
 async function pushMessage( pushMessageList ) {
   const socketIdList = []
   for( let i = 0; i < pushMessageList.length; i++ ) {
-    const { fromUserId } = pushMessageList[i]
+    const { fromUserId, params } = pushMessageList[i]
     const socketId = await redisClient.get( fromUserId )
-    socketId && socketIdList.push( { socketId, pushMessage: pushMessageList[i] } )
+    socketId && socketIdList.push( { socketId, pushMessage: params } )
   }
 
   for( let i = 0; i < socketIdList.length; i++ ) {

@@ -4,7 +4,7 @@ redisClient = createClient()
 
 function conntectRedis() {
   redisClient.connect();
-  redisClient.on('error', (err) => console.log('Redis Client Error', err));
+  redisClient.on('error', (err) => console.error('Redis Client Error', err));
 }
 
 function getRedisClient() {

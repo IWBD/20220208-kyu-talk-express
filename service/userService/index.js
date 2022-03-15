@@ -67,11 +67,12 @@ module.exports = {
     res = await common.connPromise( conn, s, [ userId ] )
     return common.connResultsAsCamelCase( res )
   },
-  getUserList: async function( conn, userIdList ) {
+  getUserListByUserId: async function( conn, userIdList ) {
     const userIdListStr = _.map( userIdList, userId => {
       return `'${userId}'`
     } ).join(',')
-    let res = await common.connPromise( conn, sql.selectUserList, [ _.join( userIdList, ', ' ) ] )
+    const s = _.replace( sql.selectUserList, '{{userIdList}}', userIdListStr )
+    let res = await common.connPromise( conn, s )
     return common.connResultsAsCamelCase( res )
   }
 }
@@ -108,7 +109,7 @@ const sql = {
   selectUserList: `
     SELECT user_id, name
     FROM user
-    WHERE user_id in (?)`,
+    WHERE user_id in ({{userIdList}})`,
   updateUserRelation: `
     UPDATE user_relation
     SET is_friend = ?, is_block = ?
