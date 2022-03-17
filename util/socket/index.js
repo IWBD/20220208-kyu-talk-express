@@ -18,16 +18,16 @@ function conntectSocket( server ) {
   } )
 }
 
-async function pushMessage( pushMessageList ) {
+async function pushClient( eventName, pushList ) {
   const socketIdList = []
-  for( let i = 0; i < pushMessageList.length; i++ ) {
-    const { fromUserId, params } = pushMessageList[i]
-    const socketId = await redisClient.get( fromUserId )
-    socketId && socketIdList.push( { socketId, pushMessage: params } )
+  for( let i = 0; i < pushList.length; i++ ) {
+    const { userId, params } = pushList[i]
+    const socketId = await redisClient.get( userId )
+    socketId && socketIdList.push( { socketId, params } )
   }
 
   for( let i = 0; i < socketIdList.length; i++ ) {
-    socketIo.to( socketIdList[i].socketId ).emit( 'message', socketIdList[i].pushMessage )
+    socketIo.to( socketIdList[i].socketId ).emit( eventName, socketIdList[i].params )
   }
 }
 
@@ -35,4 +35,4 @@ function getSocketIo() {
   return socketIo
 }
 
-module.exports = { conntectSocket, getSocketIo, pushMessage }
+module.exports = { conntectSocket, getSocketIo, pushClient }

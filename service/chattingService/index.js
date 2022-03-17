@@ -87,7 +87,10 @@ module.exports = {
     messageList = _( sendMessageList )
       .concat( fromMessageList )
       .groupBy( 'messageId' )
-      .map( messageList => {
+      .map( ( messageList, messageId ) => {
+        if( messageId === 364 ) {
+          console.log( messageList )
+        }
         const message = messageList[0]
         const fromUserList = _.map( messageList, ( { fromUserId, isRead } ) => {
           return {
@@ -175,6 +178,10 @@ module.exports = {
     }
 
     return insertId
+  },
+  readMessage: async function( conn, userId, messageIdList ) {
+    const s = _.replace( sql.updateFromUser, '{{messageIdList}}', _.join( messageIdList, ', ' ) )
+    await common.connPromise( conn, s, [ userId ] )
   }
 }
 
@@ -220,5 +227,9 @@ const sql = {
     VALUES( ?, ? )`,
   inserChattingRoom: `
     INSERT INTO chatting_room( create_user_id, room_user, create_date )
-    VALUES( ?, ?, ? )`
+    VALUES( ?, ?, ? )`,
+  updateFromUser: `
+    UPDATE from_user
+    SET is_read = 1
+    WHERE user_id = ? AND message_id IN ( {{messageIdList}} )`
 }
